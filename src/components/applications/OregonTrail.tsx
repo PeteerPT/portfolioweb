@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import DosPlayer from '../dos/DosPlayer';
 import Window from '../os/Window';
 
@@ -7,6 +7,14 @@ export interface OregonTrailAppProps extends WindowAppProps {}
 const OregonTrailApp: React.FC<OregonTrailAppProps> = (props) => {
     const [width, setWidth] = useState(920);
     const [height, setHeight] = useState(750);
+
+    // Toca o som ao abrir a janela
+    useEffect(() => {
+      const audio = new window.Audio("/sound-opengames.mp3");
+      audio.currentTime = 0;
+      audio.volume = 0.93;
+      audio.play().catch(() => {});
+    }, []);
 
     return (
         <Window
