@@ -13,7 +13,7 @@ function App() {
             if (isDown) return; // Evita duplo clique
             isDown = true;
             if (!audioDown) {
-                audioDown = new window.Audio('/static/audio/mouse/mouse_down.mp3');
+                audioDown = new window.Audio('/mouse_down.mp3');
                 audioDown.volume = 0.75;
             }
             audioDown.currentTime = 0;
@@ -22,7 +22,7 @@ function App() {
         const playUp = () => {
             isDown = false;
             if (!audioUp) {
-                audioUp = new window.Audio('/static/audio/mouse/mouse_up.mp3');
+                audioUp = new window.Audio('/mouse_up.mp3');
                 audioUp.volume = 0.82;
             }
             audioUp.currentTime = 0;
