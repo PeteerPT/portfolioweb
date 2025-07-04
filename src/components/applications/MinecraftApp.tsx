@@ -8,6 +8,14 @@ const MINECRAFT_URL = "https://classic.minecraft.net/";
 const MinecraftApp: React.FC<MinecraftAppProps> = (props) => {
   const [loaded, setLoaded] = useState(false);
 
+  // Toca o som ao abrir a janela
+  React.useEffect(() => {
+    const audio = new window.Audio("/sound-opengames.mp3");
+    audio.currentTime = 0;
+    audio.volume = 0.93;
+    audio.play().catch(() => {}); // ignora erro de autoplay
+  }, []);
+
   return (
     <Window
       width={800}
@@ -21,7 +29,7 @@ const MinecraftApp: React.FC<MinecraftAppProps> = (props) => {
       minimizeWindow={props.onMinimize}
       bottomLeftText="Minecraft Classic in Browser"
     >
-      {/* Loading overlay, igualzinho ao Doom/Oregon */}
+      {/* Loading overlay */}
       {!loaded && (
         <div style={{
           position: "absolute",
