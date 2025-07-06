@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useRef } from 'react'; // Adicionado useRef
 import Colors from '../../constants/colors';
 import ShowcaseExplorer from '../applications/ShowcaseExplorer';
 import Doom from '../applications/Doom';
@@ -41,60 +41,15 @@ const APPLICATIONS: {
         component: React.FC<ExtendedWindowAppProps<any>>;
     };
 } = {
-    showcase: {
-        key: 'showcase',
-        name: 'My Portfólio',
-        shortcutIcon: 'showcaseIcon',
-        component: ShowcaseExplorer,
-    },
-    trail: {
-        key: 'trail',
-        name: 'The Oregon Trail',
-        shortcutIcon: 'trailIcon',
-        component: OregonTrail,
-    },
-    doom: {
-        key: 'doom',
-        name: 'Doom',
-        shortcutIcon: 'doomIcon',
-        component: Doom,
-    },
-    scrabble: {
-        key: 'scrabble',
-        name: 'Scrabble',
-        shortcutIcon: 'scrabbleIcon',
-        component: Scrabble,
-    },
-    wordle: {
-        key: 'wordle',
-        name: 'Wordle',
-        shortcutIcon: 'wordleIcon',
-        component: Wordle,
-    },
-    credits: {
-        key: 'credits',
-        name: 'Credits',
-        shortcutIcon: 'credits',
-        component: Credits,
-    },
-    music: {
-        key: 'music',
-        name: 'Music Player',
-        shortcutIcon: 'cdIcon',
-        component: MusicApp,
-    },
-    minecraft: {
-        key: 'minecraft',
-        name: 'Minecraft',
-        shortcutIcon: 'minecraftIcon',
-        component: MinecraftApp,
-    },
-    calculator: {
-        key: 'calculator',
-        name: 'Calculator',
-        shortcutIcon: 'calculatorIcon',
-        component: CalculatorApp,
-    },
+    showcase: { key: 'showcase', name: 'My Portfólio', shortcutIcon: 'showcaseIcon', component: ShowcaseExplorer },
+    trail: { key: 'trail', name: 'The Oregon Trail', shortcutIcon: 'trailIcon', component: OregonTrail },
+    doom: { key: 'doom', name: 'Doom', shortcutIcon: 'doomIcon', component: Doom },
+    scrabble: { key: 'scrabble', name: 'Scrabble', shortcutIcon: 'scrabbleIcon', component: Scrabble },
+    wordle: { key: 'wordle', name: 'Wordle', shortcutIcon: 'wordleIcon', component: Wordle },
+    credits: { key: 'credits', name: 'Credits', shortcutIcon: 'credits', component: Credits },
+    music: { key: 'music', name: 'Music Player', shortcutIcon: 'cdIcon', component: MusicApp },
+    minecraft: { key: 'minecraft', name: 'Minecraft', shortcutIcon: 'minecraftIcon', component: MinecraftApp },
+    calculator: { key: 'calculator', name: 'Calculator', shortcutIcon: 'calculatorIcon', component: CalculatorApp },
 };
 
 const Desktop: React.FC<DesktopProps> = (props) => {
@@ -103,8 +58,12 @@ const Desktop: React.FC<DesktopProps> = (props) => {
     const [shutdown, setShutdown] = useState(false);
     const [numShutdowns, setNumShutdowns] = useState(1);
 
-    // As dependências dos hooks useCallback foram mantidas como no seu original
-    // para evitar alterações inesperadas no comportamento.
+    // --- INÍCIO DA ALTERAÇÃO ---
+    // Usamos uma 'ref' para controlar se uma janela está em processo de abertura.
+    // Isto não causa re-renderizações e funciona como um "portão" ou "lock".
+    const isOpeningWindow = useRef(false);
+    // --- FIM DA ALTERAÇÃO ---
+
     const rebootDesktop = useCallback(() => {
         setWindows({});
     }, []);
@@ -149,7 +108,7 @@ const Desktop: React.FC<DesktopProps> = (props) => {
                 },
             }));
         },
-        [getHighestZIndex] // Dependência mantida como no original
+        [getHighestZIndex]
     );
 
     const addWindow = useCallback(
@@ -165,14 +124,14 @@ const Desktop: React.FC<DesktopProps> = (props) => {
                 },
             }));
         },
-        [getHighestZIndex] // Dependência mantida como no original
+        [getHighestZIndex]
     );
 
     useEffect(() => {
         if (shutdown === true) {
             rebootDesktop();
         }
-    }, [shutdown, rebootDesktop]); // Adicionado rebootDesktop à dependência
+    }, [shutdown, rebootDesktop]);
 
     useEffect(() => {
         const newShortcuts: DesktopShortcutProps[] = [];
@@ -181,15 +140,18 @@ const Desktop: React.FC<DesktopProps> = (props) => {
             newShortcuts.push({
                 shortcutName: app.name,
                 icon: app.shortcutIcon,
-                // --- INÍCIO DA ALTERAÇÃO ---
-                // A função onOpen agora aceita um parâmetro 'event', que será
-                // passado pelo componente DesktopShortcut.
                 onOpen: (event?: React.MouseEvent) => {
-                    // Esta linha é a chave: ela impede que o evento de clique
-                    // continue "borbulhando" e acione outros listeners,
-                    // o que causa o som duplicado.
+                    // --- INÍCIO DA ALTERAÇÃO ---
+                    // 1. Verificamos se o "portão" está fechado. Se estiver, ignoramos este clique.
+                    if (isOpeningWindow.current) return;
+                    
+                    // 2. O portão não está fechado, então nós o fechamos para bloquear cliques seguintes.
+                    isOpeningWindow.current = true;
+                    
+                    // 3. Opcional, mas recomendado: paramos a propagação do evento como antes.
                     event?.stopPropagation();
 
+                    // 4. Abrimos a janela como de costume.
                     addWindow(
                         app.key,
                         <app.component
@@ -199,13 +161,19 @@ const Desktop: React.FC<DesktopProps> = (props) => {
                             key={app.key}
                         />
                     );
+
+                    // 5. Após um curto período, abrimos o portão novamente.
+                    // Isso permite que o usuário abra outro programa, mas impede a cascata de sons.
+                    setTimeout(() => {
+                        isOpeningWindow.current = false;
+                    }, 500); // Meio segundo é um bom valor.
+                    // --- FIM DA ALTERAÇÃO ---
                 },
-                // --- FIM DA ALTERAÇÃO ---
             });
         });
 
         setShortcuts(newShortcuts);
-    // As dependências deste hook foram mantidas como no seu original.
+    // As dependências foram mantidas como no seu código original.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
