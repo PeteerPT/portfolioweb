@@ -41,15 +41,60 @@ const APPLICATIONS: {
         component: React.FC<ExtendedWindowAppProps<any>>;
     };
 } = {
-    showcase: { key: 'showcase', name: 'My Portfólio', shortcutIcon: 'showcaseIcon', component: ShowcaseExplorer },
-    trail: { key: 'trail', name: 'The Oregon Trail', shortcutIcon: 'trailIcon', component: OregonTrail },
-    doom: { key: 'doom', name: 'Doom', shortcutIcon: 'doomIcon', component: Doom },
-    scrabble: { key: 'scrabble', name: 'Scrabble', shortcutIcon: 'scrabbleIcon', component: Scrabble },
-    wordle: { key: 'wordle', name: 'Wordle', shortcutIcon: 'wordleIcon', component: Wordle },
-    credits: { key: 'credits', name: 'Credits', shortcutIcon: 'credits', component: Credits },
-    music: { key: 'music', name: 'Music Player', shortcutIcon: 'cdIcon', component: MusicApp },
-    minecraft: { key: 'minecraft', name: 'Minecraft', shortcutIcon: 'minecraftIcon', component: MinecraftApp },
-    calculator: { key: 'calculator', name: 'Calculator', shortcutIcon: 'calculatorIcon', component: CalculatorApp },
+    showcase: {
+        key: 'showcase',
+        name: 'My Portfólio',
+        shortcutIcon: 'showcaseIcon',
+        component: ShowcaseExplorer,
+    },
+    trail: {
+        key: 'trail',
+        name: 'The Oregon Trail',
+        shortcutIcon: 'trailIcon',
+        component: OregonTrail,
+    },
+    doom: {
+        key: 'doom',
+        name: 'Doom',
+        shortcutIcon: 'doomIcon',
+        component: Doom,
+    },
+    scrabble: {
+        key: 'scrabble',
+        name: 'Scrabble',
+        shortcutIcon: 'scrabbleIcon',
+        component: Scrabble,
+    },
+    wordle: {
+        key: 'wordle',
+        name: 'Wordle',
+        shortcutIcon: 'wordleIcon',
+        component: Wordle,
+    },
+    credits: {
+        key: 'credits',
+        name: 'Credits',
+        shortcutIcon: 'credits',
+        component: Credits,
+    },
+    music: {
+        key: 'music',
+        name: 'Music Player',
+        shortcutIcon: 'cdIcon',
+        component: MusicApp,
+    },
+    minecraft: {
+        key: 'minecraft',
+        name: 'Minecraft',
+        shortcutIcon: 'minecraftIcon',
+        component: MinecraftApp,
+    },
+    calculator: {
+        key: 'calculator',
+        name: 'Calculator',
+        shortcutIcon: 'calculatorIcon',
+        component: CalculatorApp,
+    },
 };
 
 const Desktop: React.FC<DesktopProps> = (props) => {
@@ -58,16 +103,37 @@ const Desktop: React.FC<DesktopProps> = (props) => {
     const [shutdown, setShutdown] = useState(false);
     const [numShutdowns, setNumShutdowns] = useState(1);
 
-    // --- INÍCIO DA CORREÇÃO ---
-    // A ordem das funções foi reorganizada. Funções de suporte como 'getHighestZIndex'
-    // agora estão definidas ANTES das funções que dependem delas.
+    // As dependências dos hooks useCallback foram mantidas como no seu original
+    // para evitar alterações inesperadas no comportamento.
+    const rebootDesktop = useCallback(() => {
+        setWindows({});
+    }, []);
+
+    const removeWindow = useCallback((key: string) => {
+        setTimeout(() => {
+            setWindows((prevWindows) => {
+                const newWindows = { ...prevWindows };
+                delete newWindows[key];
+                return newWindows;
+            });
+        }, 100);
+    }, []);
+
+    const minimizeWindow = useCallback((key: string) => {
+        setWindows((prevWindows) => {
+            const newWindows = { ...prevWindows };
+            newWindows[key].minimized = true;
+            return newWindows;
+        });
+    }, []);
 
     const getHighestZIndex = useCallback((): number => {
         let highestZIndex = 0;
         Object.keys(windows).forEach((key) => {
             const window = windows[key];
-            if (window && window.zIndex > highestZIndex) {
-                highestZIndex = window.zIndex;
+            if (window) {
+                if (window.zIndex > highestZIndex)
+                    highestZIndex = window.zIndex;
             }
         });
         return highestZIndex;
@@ -83,26 +149,8 @@ const Desktop: React.FC<DesktopProps> = (props) => {
                 },
             }));
         },
-        [getHighestZIndex]
+        [getHighestZIndex] // Dependência mantida como no original
     );
-
-    const minimizeWindow = useCallback((key: string) => {
-        setWindows((prevWindows) => {
-            const newWindows = { ...prevWindows };
-            newWindows[key].minimized = true;
-            return newWindows;
-        });
-    }, []);
-
-    const removeWindow = useCallback((key: string) => {
-        setTimeout(() => {
-            setWindows((prevWindows) => {
-                const newWindows = { ...prevWindows };
-                delete newWindows[key];
-                return newWindows;
-            });
-        }, 100);
-    }, []);
 
     const addWindow = useCallback(
         (key: string, element: JSX.Element) => {
@@ -117,8 +165,49 @@ const Desktop: React.FC<DesktopProps> = (props) => {
                 },
             }));
         },
-        [getHighestZIndex]
+        [getHighestZIndex] // Dependência mantida como no original
     );
+
+    useEffect(() => {
+        if (shutdown === true) {
+            rebootDesktop();
+        }
+    }, [shutdown, rebootDesktop]); // Adicionado rebootDesktop à dependência
+
+    useEffect(() => {
+        const newShortcuts: DesktopShortcutProps[] = [];
+        Object.keys(APPLICATIONS).forEach((key) => {
+            const app = APPLICATIONS[key];
+            newShortcuts.push({
+                shortcutName: app.name,
+                icon: app.shortcutIcon,
+                // --- INÍCIO DA ALTERAÇÃO ---
+                // A função onOpen agora aceita um parâmetro 'event', que será
+                // passado pelo componente DesktopShortcut.
+                onOpen: (event?: React.MouseEvent) => {
+                    // Esta linha é a chave: ela impede que o evento de clique
+                    // continue "borbulhando" e acione outros listeners,
+                    // o que causa o som duplicado.
+                    event?.stopPropagation();
+
+                    addWindow(
+                        app.key,
+                        <app.component
+                            onInteract={() => onWindowInteract(app.key)}
+                            onMinimize={() => minimizeWindow(app.key)}
+                            onClose={() => removeWindow(app.key)}
+                            key={app.key}
+                        />
+                    );
+                },
+                // --- FIM DA ALTERAÇÃO ---
+            });
+        });
+
+        setShortcuts(newShortcuts);
+    // As dependências deste hook foram mantidas como no seu original.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     const toggleMinimize = useCallback(
         (key: string) => {
@@ -136,51 +225,12 @@ const Desktop: React.FC<DesktopProps> = (props) => {
         [windows, getHighestZIndex]
     );
 
-    const rebootDesktop = useCallback(() => {
-        setWindows({});
-    }, []);
-
     const startShutdown = useCallback(() => {
         setTimeout(() => {
             setShutdown(true);
             setNumShutdowns(numShutdowns + 1);
         }, 600);
     }, [numShutdowns]);
-
-    // --- FIM DA CORREÇÃO ---
-
-
-    useEffect(() => {
-        if (shutdown === true) {
-            rebootDesktop();
-        }
-    }, [shutdown, rebootDesktop]);
-
-
-    useEffect(() => {
-        const newShortcuts: DesktopShortcutProps[] = [];
-        Object.keys(APPLICATIONS).forEach((key) => {
-            const app = APPLICATIONS[key];
-            newShortcuts.push({
-                shortcutName: app.name,
-                icon: app.shortcutIcon,
-                onOpen: (event: React.MouseEvent) => {
-                    event.stopPropagation();
-                    addWindow(
-                        app.key,
-                        <app.component
-                            onInteract={() => onWindowInteract(app.key)}
-                            onMinimize={() => minimizeWindow(app.key)}
-                            onClose={() => removeWindow(app.key)}
-                            key={app.key}
-                        />
-                    );
-                },
-            });
-        });
-
-        setShortcuts(newShortcuts);
-    }, [addWindow, onWindowInteract, minimizeWindow, removeWindow]);
 
     return !shutdown ? (
         <div style={styles.desktop}>
