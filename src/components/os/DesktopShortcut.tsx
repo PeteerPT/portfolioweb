@@ -7,13 +7,9 @@ export interface DesktopShortcutProps {
     icon: IconName;
     shortcutName: string;
     invertText?: boolean;
-    onOpen: () => void;
+    onOpen: (event: React.MouseEvent) => void;
 }
 
-// --- INÍCIO DA ALTERAÇÃO ---
-
-// Função utilitária para detectar dispositivos com capacidade de toque.
-// Ela é segura para ser executada no servidor (SSR) ou no cliente.
 const isTouchDevice = () => {
     try {
         return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
@@ -21,8 +17,6 @@ const isTouchDevice = () => {
         return false;
     }
 };
-
-// --- FIM DA ALTERAÇÃO ---
 
 const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
     icon,
@@ -34,17 +28,9 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
     const [shortcutId, setShortcutId] = useState('');
     const [lastSelected, setLastSelected] = useState(false);
     const containerRef = useRef<any>();
-
     const [scaledStyle, setScaledStyle] = useState({});
-
     const [doubleClickTimerActive, setDoubleClickTimerActive] = useState(false);
-
-    // --- INÍCIO DA ALTERAÇÃO ---
-
-    // Verifica se é um dispositivo móvel uma única vez quando o componente é montado.
     const isMobile = useMemo(() => isTouchDevice(), []);
-
-    // --- FIM DA ALTERAÇÃO ---
 
     const getShortcutId = useCallback(() => {
         const shortcutId = shortcutName.replace(/\s/g, '');
@@ -83,18 +69,17 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
     );
 
     // --- INÍCIO DA ALTERAÇÃO ---
-    // A lógica de clique agora diferencia mobile e desktop.
-
-    const handleClickShortcut = useCallback(() => {
-        // Se for um dispositivo móvel, abra com um único clique e ignore a lógica de clique duplo.
+    // A função agora aceita o evento de clique e o passa para a prop onOpen.
+    const handleClickShortcut = useCallback((event: React.MouseEvent) => {
+        // Se for um dispositivo móvel, abra com um único clique.
         if (isMobile) {
-            onOpen && onOpen();
+            onOpen && onOpen(event); // Passa o evento
             return;
         }
 
         // Lógica original de clique duplo para desktop.
         if (doubleClickTimerActive) {
-            onOpen && onOpen();
+            onOpen && onOpen(event); // Passa o evento
             setIsSelected(false);
             setDoubleClickTimerActive(false);
             return;
@@ -107,7 +92,6 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
             setDoubleClickTimerActive(false);
         }, 300);
     }, [doubleClickTimerActive, isMobile, onOpen]);
-
     // --- FIM DA ALTERAÇÃO ---
 
     useEffect(() => {
@@ -121,7 +105,7 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
         <div
             id={`${shortcutId}`}
             style={Object.assign({}, styles.appShortcut, scaledStyle)}
-            onMouseDown={handleClickShortcut}
+            onMouseDown={handleClickShortcut} // Este evento já nos dá o 'event' que precisamos.
             ref={containerRef}
         >
             <div id={`${shortcutId}`} style={styles.iconContainer}>
@@ -137,7 +121,6 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
                         }
                     )}
                 />
-                {/* Exibe o ícone */}
                 <img src={getIconByName(icon)} alt={shortcutName} style={{ width: 32, height: 32 }} />
             </div>
             <div
@@ -166,7 +149,6 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
     );
 };
 
-// Define o tipo para a folha de estilos para evitar erros de TypeScript
 type StyleSheetCSS = { [key: string]: React.CSSProperties };
 
 const styles: StyleSheetCSS = {
