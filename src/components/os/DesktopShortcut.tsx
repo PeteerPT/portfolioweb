@@ -3,11 +3,11 @@ import { IconName, default as getIconByName } from '../../assets/icons';
 import colors from '../../constants/colors';
 import { Icon } from '../general';
 
+// Para manter a compatibilidade com o Desktop.tsx, a prop onOpen continua esperando um evento.
 export interface DesktopShortcutProps {
     icon: IconName;
     shortcutName: string;
     invertText?: boolean;
-    // A prop 'onOpen' continua esperando o evento para que o Desktop.tsx possa controlar o som
     onOpen: (event: React.MouseEvent) => void;
 }
 
@@ -33,7 +33,7 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
     const [scaledStyle, setScaledStyle] = useState({});
     const [doubleClickTimerActive, setDoubleClickTimerActive] = useState(false);
 
-    // Determina se é um dispositivo de toque (mobile)
+    // Determina se é um dispositivo de toque (mobile) uma única vez.
     const isMobile = useMemo(() => isTouchDevice(), []);
 
     const getShortcutId = useCallback(() => {
@@ -58,6 +58,43 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
         }
     }, [scaledStyle]);
 
+    // --- INÍCIO DA ALTERAÇÃO FINAL ---
+
+    // Handler específico para TOQUE (Mobile)
+    const handleTouchStart = (event: React.TouchEvent) => {
+        // Esta função só roda em dispositivos de toque
+        if (isMobile) {
+            // Impede que o navegador dispare eventos de mouse (mousedown, click) depois do toque.
+            // Esta é a chave para eliminar os sons duplicados e o delay.
+            event.preventDefault();
+            // Abre o programa imediatamente. O casting '(event as any)' é necessário
+            // porque estamos passando um TouchEvent para uma função que espera um MouseEvent,
+            // mas o Desktop.tsx só usa o evento para stopPropagation, então funciona.
+            onOpen(event as any);
+        }
+    };
+
+    // Handler específico para CLIQUE DE MOUSE (Desktop)
+    const handleMouseDown = (event: React.MouseEvent) => {
+        // Esta função só roda em dispositivos NÃO-toque (desktops)
+        if (!isMobile) {
+            // Lógica original de duplo-clique, que já estava perfeita para o desktop.
+            if (doubleClickTimerActive) {
+                onOpen(event);
+                setIsSelected(false);
+                setDoubleClickTimerActive(false);
+                return;
+            }
+            setIsSelected(true);
+            setLastSelected(true);
+            setDoubleClickTimerActive(true);
+            setTimeout(() => {
+                setDoubleClickTimerActive(false);
+            }, 300);
+        }
+    };
+    
+    // O handler de clique fora permanece o mesmo
     const handleClickOutside = useCallback(
         (event: MouseEvent) => {
             // @ts-ignore
@@ -72,34 +109,7 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
         [isSelected, setIsSelected, setLastSelected, lastSelected, shortcutId]
     );
 
-    // --- INÍCIO DA ALTERAÇÃO PRINCIPAL ---
-    // A lógica de clique agora é acionada pelo evento 'onClick'.
-    const handleClickShortcut = useCallback((event: React.MouseEvent) => {
-        // No mobile, um único clique abre o programa.
-        if (isMobile) {
-            onOpen(event);
-            return;
-        }
-
-        // No desktop, a lógica de clique duplo é mantida.
-        if (doubleClickTimerActive) {
-            onOpen(event);
-            setIsSelected(false);
-            setDoubleClickTimerActive(false);
-            return;
-        }
-
-        setIsSelected(true);
-        setLastSelected(true);
-        setDoubleClickTimerActive(true);
-        setTimeout(() => {
-            setDoubleClickTimerActive(false);
-        }, 300);
-    }, [doubleClickTimerActive, isMobile, onOpen]);
-    // --- FIM DA ALTERAÇÃO PRINCIPAL ---
-
     useEffect(() => {
-        // O listener para "clicar fora" continua sendo 'mousedown' para uma resposta mais rápida.
         document.addEventListener('mousedown', handleClickOutside);
         return () => {
             document.removeEventListener('mousedown', handleClickOutside);
@@ -110,10 +120,13 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
         <div
             id={`${shortcutId}`}
             style={Object.assign({}, styles.appShortcut, scaledStyle)}
-            // O evento foi trocado de 'onMouseDown' para 'onClick'
-            onClick={handleClickShortcut}
+            // Usamos os dois handlers: um para toque, outro para mouse.
+            // O código dentro de cada um garante que apenas o correto será executado.
+            onTouchStart={handleTouchStart}
+            onMouseDown={handleMouseDown}
             ref={containerRef}
         >
+        {/* O resto do JSX continua idêntico */}
             <div id={`${shortcutId}`} style={styles.iconContainer}>
                 <div
                     id={`${shortcutId}`}
@@ -154,6 +167,7 @@ const DesktopShortcut: React.FC<DesktopShortcutProps> = ({
         </div>
     );
 };
+// --- FIM DA ALTERAÇÃO FINAL ---
 
 type StyleSheetCSS = { [key: string]: React.CSSProperties };
 
