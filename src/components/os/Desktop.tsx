@@ -108,33 +108,28 @@ const Desktop: React.FC<DesktopProps> = (props) => {
             rebootDesktop();
         }
     }, [shutdown]);
-
-    useEffect(() => {
-        const newShortcuts: DesktopShortcutProps[] = [];
-        Object.keys(APPLICATIONS).forEach((key) => {
-            const app = APPLICATIONS[key];
-            newShortcuts.push({
-                shortcutName: app.name,
-                icon: app.shortcutIcon,
-                onOpen: () => {
-                    addWindow(
-                        app.key,
-                        <app.component
-                            onInteract={() => onWindowInteract(app.key)}
-                            onMinimize={() => minimizeWindow(app.key)}
-                            onClose={() => removeWindow(app.key)}
-                            key={app.key}
-                        />
-                    );
+    
+    // As funções abaixo foram movidas para fora do useEffect para que possam ser usadas
+    // como dependências estáveis no hook.
+    const onWindowInteract = useCallback(
+        (key: string) => {
+            setWindows((prevWindows) => ({
+                ...prevWindows,
+                [key]: {
+                    ...prevWindows[key],
+                    zIndex: 1 + getHighestZIndex(),
                 },
-            });
+            }));
+        },
+        [setWindows, getHighestZIndex]
+    );
+
+    const minimizeWindow = useCallback((key: string) => {
+        setWindows((prevWindows) => {
+            const newWindows = { ...prevWindows };
+            newWindows[key].minimized = true;
+            return newWindows;
         });
-
-        setShortcuts(newShortcuts);
-    }, []);
-
-    const rebootDesktop = useCallback(() => {
-        setWindows({});
     }, []);
 
     const removeWindow = useCallback((key: string) => {
@@ -147,12 +142,62 @@ const Desktop: React.FC<DesktopProps> = (props) => {
         }, 100);
     }, []);
 
-    const minimizeWindow = useCallback((key: string) => {
-        setWindows((prevWindows) => {
-            const newWindows = { ...prevWindows };
-            newWindows[key].minimized = true;
-            return newWindows;
+    const addWindow = useCallback(
+        (key: string, element: JSX.Element) => {
+            setWindows((prevState) => ({
+                ...prevState,
+                [key]: {
+                    zIndex: getHighestZIndex() + 1,
+                    minimized: false,
+                    component: element,
+                    name: APPLICATIONS[key].name,
+                    icon: APPLICATIONS[key].shortcutIcon,
+                },
+            }));
+        },
+        [getHighestZIndex]
+    );
+
+    useEffect(() => {
+        const newShortcuts: DesktopShortcutProps[] = [];
+        Object.keys(APPLICATIONS).forEach((key) => {
+            const app = APPLICATIONS[key];
+            newShortcuts.push({
+                shortcutName: app.name,
+                icon: app.shortcutIcon,
+                // --- INÍCIO DA ALTERAÇÃO ---
+                // A função onOpen agora recebe o evento de clique.
+                onOpen: (event: React.MouseEvent) => {
+                    // Impede que o clique "vaze" para outros componentes,
+                    // resolvendo o problema do som duplicado.
+                    event.stopPropagation();
+                    
+                    // Opcional: Se quiser ter um som específico para abrir
+                    // programas, você pode tocar ele aqui.
+                    // const openSound = new Audio('/path/to/open-sound.mp3');
+                    // openSound.play();
+
+                    addWindow(
+                        app.key,
+                        <app.component
+                            onInteract={() => onWindowInteract(app.key)}
+                            onMinimize={() => minimizeWindow(app.key)}
+                            onClose={() => removeWindow(app.key)}
+                            key={app.key}
+                        />
+                    );
+                },
+                // --- FIM DA ALTERAÇÃO ---
+            });
         });
+
+        setShortcuts(newShortcuts);
+    // Adicionamos as dependências corretas. Como elas são estáveis (definidas com useCallback),
+    // este hook continuará executando apenas uma vez.
+    }, [addWindow, onWindowInteract, minimizeWindow, removeWindow]);
+
+    const rebootDesktop = useCallback(() => {
+        setWindows({});
     }, []);
 
     const getHighestZIndex = useCallback((): number => {
@@ -183,42 +228,13 @@ const Desktop: React.FC<DesktopProps> = (props) => {
         [windows, getHighestZIndex]
     );
 
-    const onWindowInteract = useCallback(
-        (key: string) => {
-            setWindows((prevWindows) => ({
-                ...prevWindows,
-                [key]: {
-                    ...prevWindows[key],
-                    zIndex: 1 + getHighestZIndex(),
-                },
-            }));
-        },
-        [setWindows, getHighestZIndex]
-    );
-
     const startShutdown = useCallback(() => {
         setTimeout(() => {
             setShutdown(true);
             setNumShutdowns(numShutdowns + 1);
         }, 600);
     }, [numShutdowns]);
-
-    const addWindow = useCallback(
-        (key: string, element: JSX.Element) => {
-            setWindows((prevState) => ({
-                ...prevState,
-                [key]: {
-                    zIndex: getHighestZIndex() + 1,
-                    minimized: false,
-                    component: element,
-                    name: APPLICATIONS[key].name,
-                    icon: APPLICATIONS[key].shortcutIcon,
-                },
-            }));
-        },
-        [getHighestZIndex]
-    );
-
+    
     return !shutdown ? (
         <div style={styles.desktop}>
             {Object.keys(windows).map((key) => {
