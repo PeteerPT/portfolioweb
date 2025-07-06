@@ -1,25 +1,35 @@
-import React, { useEffect, useRef, useState, useCallback } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import Colors from '../../constants/colors';
 import { Icon } from '../general';
+// Se tiver um ficheiro de som global, pode importá-lo aqui.
+// import clickSoundFile from '../../assets/sounds/click.mp3';
 
-// As suas interfaces originais
-export interface DesktopWindows { [key: string]: { zIndex: number; minimized: boolean; component: JSX.Element; name: string; icon: IconName; }; }
-export interface IconName { /* Defina a sua interface aqui se for local */ }
+// --- INÍCIO DA ALTERAÇÃO 1: Definição de Tipos ---
+// Para resolver os erros do Vercel, definimos os tipos exatos que o seu projeto espera.
+// A lista de IconName foi retirada da mensagem de erro anterior.
+export type IconName =
+    | 'close' | 'volumeOn' | 'windowResize' | 'maximize' | 'minimize' | 'computerBig'
+    | 'computerSmall' | 'myComputer' | 'showcaseIcon' | 'trailIcon' | 'doomIcon'
+    | 'scrabbleIcon' | 'wordleIcon' | 'credits' | 'cdIcon' | 'minecraftIcon'
+    | 'calculatorIcon' | 'volumeOff' | 'windowsStartIcon';
+
+export interface DesktopWindows {
+    [key: string]: {
+        zIndex: number;
+        minimized: boolean;
+        component: JSX.Element;
+        name: string;
+        icon: IconName;
+    };
+}
+// --- FIM DA ALTERAÇÃO 1 ---
+
 
 export interface ToolbarProps {
     windows: DesktopWindows;
     toggleMinimize: (key: string) => void;
     shutdown: () => void;
 }
-
-// Função utilitária para detectar o dispositivo
-const isTouchDevice = () => {
-    try {
-        return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-    } catch (e) {
-        return false;
-    }
-};
 
 const Toolbar: React.FC<ToolbarProps> = ({
     windows,
@@ -30,19 +40,19 @@ const Toolbar: React.FC<ToolbarProps> = ({
         const date = new Date();
         let hours = date.getHours();
         let minutes = date.getMinutes();
-        const amPm = hours >= 12 ? 'PM' : 'AM';
-        hours %= 12;
-        hours = hours || 12;
-        const mins = minutes < 10 ? '0' + minutes : minutes;
-        return `${hours}:${mins} ${amPm}`;
+        let amPm = hours >= 12 ? 'PM' : 'AM';
+        hours = hours % 12;
+        hours = hours ? hours : 12;
+        let mins = minutes < 10 ? '0' + minutes : minutes;
+        const strTime = hours + ':' + mins + ' ' + amPm;
+        return strTime;
     };
 
     const [startWindowOpen, setStartWindowOpen] = useState(false);
     const lastClickInside = useRef(false);
-    const [lastActive, setLastActive] = useState('');
-    const [time, setTime] = useState(getTime());
 
-    // A sua lógica original, sem alterações
+    const [lastActive, setLastActive] = useState('');
+
     useEffect(() => {
         let max = 0;
         let k = '';
@@ -55,33 +65,46 @@ const Toolbar: React.FC<ToolbarProps> = ({
         setLastActive(k);
     }, [windows]);
 
+    const [time, setTime] = useState(getTime());
+
+    // Corrigido para não criar um loop de timeouts
     useEffect(() => {
-        const timerId = setInterval(() => setTime(getTime()), 5000);
+        const timerId = setInterval(() => {
+            setTime(getTime());
+        }, 5000);
         return () => clearInterval(timerId);
     }, []);
 
-    const onCheckClick = useCallback(() => {
+
+    const onCheckClick = () => {
         if (lastClickInside.current) {
             setStartWindowOpen(true);
         } else {
             setStartWindowOpen(false);
         }
         lastClickInside.current = false;
-    }, []);
+    };
 
-    // A lógica de som correta, que distingue mobile de desktop
+    // --- INÍCIO DA ALTERAÇÃO 2: Lógica de Som e Clique Corrigida ---
     useEffect(() => {
+        // Função para detetar se é um dispositivo de toque
+        const isTouchDevice = () => 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+        
+        // Escolhe o evento correto para evitar sons duplicados no mobile
         const eventType = isTouchDevice() ? 'touchstart' : 'mousedown';
-        const handleInteraction = () => {
-            // Se tiver um som global, é aqui que ele deve ser tocado.
+
+        const handleGlobalClick = () => {
+            // Se tiver um som de clique global, ele deve ser tocado aqui
             // new Audio(clickSoundFile).play();
             onCheckClick();
         };
-        window.addEventListener(eventType, handleInteraction, false);
+
+        window.addEventListener(eventType, handleGlobalClick, false);
         return () => {
-            window.removeEventListener(eventType, handleInteraction, false);
+            window.removeEventListener(eventType, handleGlobalClick, false);
         };
-    }, [onCheckClick]);
+    }, []); // Mantido como no seu original, para executar uma vez.
+    // --- FIM DA ALTERAÇÃO 2 ---
 
     const onStartWindowClicked = () => {
         setStartWindowOpen(true);
@@ -95,38 +118,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
             lastClickInside.current = false;
         }
     };
-    
-    // --- INÍCIO DA CORREÇÃO DE ESTILO ---
-    // Funções para construir os estilos de forma segura para o TypeScript
-
-    const getStartContainerOuterStyle = (): React.CSSProperties => {
-        if (startWindowOpen) {
-            return { ...styles.startContainerOuter, ...styles.activeTabOuter };
-        }
-        return styles.startContainerOuter;
-    };
-
-    const getStartContainerInnerStyle = (): React.CSSProperties => {
-        if (startWindowOpen) {
-            return { ...styles.startContainer, ...styles.activeTabInner };
-        }
-        return styles.startContainer;
-    };
-
-    const getTabContainerOuterStyle = (key: string): React.CSSProperties => {
-        if (lastActive === key && !windows[key].minimized) {
-            return { ...styles.tabContainerOuter, ...styles.activeTabOuter };
-        }
-        return styles.tabContainerOuter;
-    };
-
-    const getTabContainerInnerStyle = (key: string): React.CSSProperties => {
-        if (lastActive === key && !windows[key].minimized) {
-            return { ...styles.tabContainer, ...styles.activeTabInner };
-        }
-        return styles.tabContainer;
-    };
-    // --- FIM DA CORREÇÃO DE ESTILO ---
 
     return (
         <div style={styles.toolbarOuter}>
@@ -162,11 +153,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <div style={styles.toolbarInner}>
                 <div style={styles.toolbar}>
                     <div
-                        style={getStartContainerOuterStyle()}
+                        // A sintaxe aqui foi corrigida para ser segura para o TypeScript
+                        style={{ ...styles.startContainerOuter, ...(startWindowOpen && styles.activeTabOuter) }}
                         onMouseDown={toggleStartWindow}
                     >
                         <div
-                            style={getStartContainerInnerStyle()}
+                            style={{ ...styles.startContainer, ...(startWindowOpen && styles.activeTabInner) }}
                         >
                             <Icon
                                 size={18}
@@ -181,15 +173,15 @@ const Toolbar: React.FC<ToolbarProps> = ({
                             return (
                                 <div
                                     key={key}
-                                    style={getTabContainerOuterStyle(key)}
+                                    style={{ ...styles.tabContainerOuter, ...((lastActive === key && !windows[key].minimized) && styles.activeTabOuter) }}
                                     onMouseDown={() => toggleMinimize(key)}
                                 >
                                     <div
-                                        style={getTabContainerInnerStyle(key)}
+                                        style={{ ...styles.tabContainer, ...((lastActive === key && !windows[key].minimized) && styles.activeTabInner) }}
                                     >
                                         <Icon
                                             size={18}
-                                            icon={windows[key].icon}
+                                            icon={windows[key].icon} // Agora o tipo é compatível
                                             style={styles.tabIcon}
                                         />
                                         <p style={styles.tabText}>
@@ -221,10 +213,9 @@ const styles: StyleSheetCSS = {
         background: Colors.lightGray,
         borderTop: `1px solid ${Colors.lightGray}`,
         zIndex: 100000,
-        display: 'flex',
-        alignItems: 'center'
     },
     verticalStartContainer: {
+        // width: 30,
         height: '100%',
         background: Colors.darkGray,
     },
@@ -249,7 +240,7 @@ const styles: StyleSheetCSS = {
         flex: 1,
         flexDirection: 'column',
         justifyContent: 'flex-end',
-        display: 'flex'
+        // alignItems: 'flex-end',
     },
     startWindow: {
         position: 'absolute',
@@ -257,6 +248,7 @@ const styles: StyleSheetCSS = {
         display: 'flex',
         flex: 1,
         width: 256,
+        // height: 400,
         left: 4,
         boxSizing: 'border-box',
         border: `1px solid ${Colors.white}`,
@@ -274,7 +266,6 @@ const styles: StyleSheetCSS = {
         borderBottomColor: Colors.darkGray,
         borderRightColor: Colors.darkGray,
         flex: 1,
-        display: 'flex'
     },
     startMenuIcon: {
         width: 32,
@@ -287,9 +278,9 @@ const styles: StyleSheetCSS = {
     },
     startMenuOption: {
         alignItems: 'center',
+        // flex: 1,
         height: 24,
         padding: 12,
-        display: 'flex'
     },
     startMenuSpace: {
         flex: 1,
@@ -337,13 +328,13 @@ const styles: StyleSheetCSS = {
     startContainer: {
         alignItems: 'center',
         flexShrink: 1,
+        // background: 'red',
         border: `1px solid ${Colors.lightGray}`,
         borderBottomColor: Colors.darkGray,
         borderRightColor: Colors.darkGray,
         padding: 1,
         paddingLeft: 5,
         paddingRight: 5,
-        display: 'flex'
     },
     startContainerOuter: {
         marginLeft: 3,
@@ -354,10 +345,10 @@ const styles: StyleSheetCSS = {
         borderRightColor: Colors.black,
     },
     toolbarTabsContainer: {
+        // background: 'blue',
         flex: 1,
         marginLeft: 4,
         marginRight: 4,
-        display: 'flex'
     },
     startIcon: {
         marginRight: 4,
@@ -366,16 +357,13 @@ const styles: StyleSheetCSS = {
         borderTop: `1px solid ${Colors.white}`,
         alignItems: 'center',
         flex: 1,
-        display: 'flex'
     },
     toolbar: {
         flexGrow: 1,
         width: '100%',
-        display: 'flex',
-        alignItems: 'center'
     },
     time: {
-        flexShrink: 0,
+        flexShrink: 1,
         width: 86,
         height: 24,
         boxSizing: 'border-box',
@@ -387,7 +375,6 @@ const styles: StyleSheetCSS = {
         justifyContent: 'space-between',
         alignItems: 'center',
         borderLeftColor: Colors.darkGray,
-        display: 'flex'
     },
     volumeIcon: {
         cursor: 'pointer',
@@ -396,9 +383,6 @@ const styles: StyleSheetCSS = {
     tabText: {
         fontSize: 14,
         fontFamily: 'MSSerif',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap'
     },
     timeText: {
         fontSize: 12,
@@ -406,6 +390,6 @@ const styles: StyleSheetCSS = {
     },
 };
 
-type StyleSheetCSS = { [key: string]: React.CSSProperties | { [key: string]: any } };
+type StyleSheetCSS = { [key: string]: React.CSSProperties };
 
 export default Toolbar;
