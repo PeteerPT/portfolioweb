@@ -1,21 +1,10 @@
 import React, { useEffect, useRef, useState, useCallback } from 'react';
 import Colors from '../../constants/colors';
 import { Icon } from '../general';
-// Se você tem um ficheiro de som, importe-o aqui.
-// import clickSoundFile from '../../assets/sounds/click.mp3';
 
-// Supondo que estas interfaces venham de outros ficheiros.
-export interface DesktopWindows {
-    [key: string]: {
-        zIndex: number;
-        minimized: boolean;
-        component: JSX.Element;
-        name: string;
-        icon: IconName;
-    };
-}
-export interface IconName { /* ... */ }
-
+// As suas interfaces originais
+export interface DesktopWindows { [key: string]: { zIndex: number; minimized: boolean; component: JSX.Element; name: string; icon: IconName; }; }
+export interface IconName { /* Defina a sua interface aqui se for local */ }
 
 export interface ToolbarProps {
     windows: DesktopWindows;
@@ -23,32 +12,29 @@ export interface ToolbarProps {
     shutdown: () => void;
 }
 
+// Função utilitária para detectar o dispositivo
+const isTouchDevice = () => {
+    try {
+        return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+    } catch (e) {
+        return false;
+    }
+};
+
 const Toolbar: React.FC<ToolbarProps> = ({
     windows,
     toggleMinimize,
     shutdown,
 }) => {
-    // --- INÍCIO DA ALTERAÇÃO 1 ---
-    // Função utilitária para detectar dispositivos com ecrã tátil.
-    const isTouchDevice = () => {
-        try {
-            return 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        } catch (e) {
-            return false;
-        }
-    };
-    // --- FIM DA ALTERAÇÃO 1 ---
-
     const getTime = () => {
         const date = new Date();
         let hours = date.getHours();
         let minutes = date.getMinutes();
-        let amPm = hours >= 12 ? 'PM' : 'AM';
-        hours = hours % 12;
-        hours = hours ? hours : 12;
-        let mins = minutes < 10 ? '0' + minutes : minutes;
-        const strTime = hours + ':' + mins + ' ' + amPm;
-        return strTime;
+        const amPm = hours >= 12 ? 'PM' : 'AM';
+        hours %= 12;
+        hours = hours || 12;
+        const mins = minutes < 10 ? '0' + minutes : minutes;
+        return `${hours}:${mins} ${amPm}`;
     };
 
     const [startWindowOpen, setStartWindowOpen] = useState(false);
@@ -56,7 +42,7 @@ const Toolbar: React.FC<ToolbarProps> = ({
     const [lastActive, setLastActive] = useState('');
     const [time, setTime] = useState(getTime());
 
-    // A sua lógica original para encontrar a janela ativa.
+    // A sua lógica original, sem alterações
     useEffect(() => {
         let max = 0;
         let k = '';
@@ -69,14 +55,10 @@ const Toolbar: React.FC<ToolbarProps> = ({
         setLastActive(k);
     }, [windows]);
 
-    // A sua lógica original para o relógio.
     useEffect(() => {
-        const updateTime = () => {
-            setTime(getTime());
-            setTimeout(updateTime, 5000);
-        };
-        updateTime();
-    }, []); // Corrigido para executar apenas uma vez na montagem.
+        const timerId = setInterval(() => setTime(getTime()), 5000);
+        return () => clearInterval(timerId);
+    }, []);
 
     const onCheckClick = useCallback(() => {
         if (lastClickInside.current) {
@@ -87,24 +69,19 @@ const Toolbar: React.FC<ToolbarProps> = ({
         lastClickInside.current = false;
     }, []);
 
-    // --- INÍCIO DA ALTERAÇÃO 2 ---
-    // O seu useEffect original, agora mais inteligente.
+    // A lógica de som correta, que distingue mobile de desktop
     useEffect(() => {
-        // Se desejar um som de clique global, pode criá-lo aqui.
-        // const clickSound = new Audio(clickSoundFile);
-
-        const handleInteraction = (event: MouseEvent | TouchEvent) => {
-            // clickSound.play();
+        const eventType = isTouchDevice() ? 'touchstart' : 'mousedown';
+        const handleInteraction = () => {
+            // Se tiver um som global, é aqui que ele deve ser tocado.
+            // new Audio(clickSoundFile).play();
             onCheckClick();
         };
-
-        const eventType = isTouchDevice() ? 'touchstart' : 'mousedown';
         window.addEventListener(eventType, handleInteraction, false);
         return () => {
             window.removeEventListener(eventType, handleInteraction, false);
         };
-    }, [onCheckClick]); // Adicionada a dependência correta.
-    // --- FIM DA ALTERAÇÃO 2 ---
+    }, [onCheckClick]);
 
     const onStartWindowClicked = () => {
         setStartWindowOpen(true);
@@ -118,13 +95,44 @@ const Toolbar: React.FC<ToolbarProps> = ({
             lastClickInside.current = false;
         }
     };
+    
+    // --- INÍCIO DA CORREÇÃO DE ESTILO ---
+    // Funções para construir os estilos de forma segura para o TypeScript
+
+    const getStartContainerOuterStyle = (): React.CSSProperties => {
+        if (startWindowOpen) {
+            return { ...styles.startContainerOuter, ...styles.activeTabOuter };
+        }
+        return styles.startContainerOuter;
+    };
+
+    const getStartContainerInnerStyle = (): React.CSSProperties => {
+        if (startWindowOpen) {
+            return { ...styles.startContainer, ...styles.activeTabInner };
+        }
+        return styles.startContainer;
+    };
+
+    const getTabContainerOuterStyle = (key: string): React.CSSProperties => {
+        if (lastActive === key && !windows[key].minimized) {
+            return { ...styles.tabContainerOuter, ...styles.activeTabOuter };
+        }
+        return styles.tabContainerOuter;
+    };
+
+    const getTabContainerInnerStyle = (key: string): React.CSSProperties => {
+        if (lastActive === key && !windows[key].minimized) {
+            return { ...styles.tabContainer, ...styles.activeTabInner };
+        }
+        return styles.tabContainer;
+    };
+    // --- FIM DA CORREÇÃO DE ESTILO ---
 
     return (
         <div style={styles.toolbarOuter}>
             {startWindowOpen && (
                 <div
                     onMouseDown={onStartWindowClicked}
-                    onTouchStart={onStartWindowClicked} // Adicionado para consistência
                     style={styles.startWindow}
                 >
                     <div style={styles.startWindowInner}>
@@ -138,7 +146,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
                                 className="start-menu-option"
                                 style={styles.startMenuOption}
                                 onMouseDown={shutdown}
-                                onTouchStart={shutdown} // Adicionado para consistência
                             >
                                 <Icon
                                     style={styles.startMenuIcon}
@@ -155,20 +162,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <div style={styles.toolbarInner}>
                 <div style={styles.toolbar}>
                     <div
-                        // --- INÍCIO DA ALTERAÇÃO 3 (Correção de Estilo) ---
-                        style={{
-                            ...styles.startContainerOuter,
-                            ...(startWindowOpen ? styles.activeTabOuter : {})
-                        }}
-                        // --- FIM DA ALTERAÇÃO 3 ---
+                        style={getStartContainerOuterStyle()}
                         onMouseDown={toggleStartWindow}
-                        onTouchStart={toggleStartWindow} // Adicionado para consistência
                     >
                         <div
-                           style={{
-                               ...styles.startContainer,
-                               ...(startWindowOpen ? styles.activeTabInner : {})
-                           }}
+                            style={getStartContainerInnerStyle()}
                         >
                             <Icon
                                 size={18}
@@ -183,18 +181,11 @@ const Toolbar: React.FC<ToolbarProps> = ({
                             return (
                                 <div
                                     key={key}
-                                    style={{
-                                        ...styles.tabContainerOuter,
-                                        ...((lastActive === key && !windows[key].minimized) ? styles.activeTabOuter : {})
-                                    }}
+                                    style={getTabContainerOuterStyle(key)}
                                     onMouseDown={() => toggleMinimize(key)}
-                                    onTouchStart={() => toggleMinimize(key)} // Adicionado para consistência
                                 >
                                     <div
-                                        style={{
-                                            ...styles.tabContainer,
-                                            ...((lastActive === key && !windows[key].minimized) ? styles.activeTabInner : {})
-                                        }}
+                                        style={getTabContainerInnerStyle(key)}
                                     >
                                         <Icon
                                             size={18}
@@ -230,8 +221,8 @@ const styles: StyleSheetCSS = {
         background: Colors.lightGray,
         borderTop: `1px solid ${Colors.lightGray}`,
         zIndex: 100000,
-        display: 'flex', // Adicionado para alinhamento
-        alignItems: 'center' // Adicionado para alinhamento
+        display: 'flex',
+        alignItems: 'center'
     },
     verticalStartContainer: {
         height: '100%',
@@ -256,16 +247,16 @@ const styles: StyleSheetCSS = {
     },
     startWindowContent: {
         flex: 1,
-        display: 'flex', // Adicionado
         flexDirection: 'column',
         justifyContent: 'flex-end',
+        display: 'flex'
     },
     startWindow: {
         position: 'absolute',
-        bottom: 32, // Corrigido
+        bottom: 28,
         display: 'flex',
+        flex: 1,
         width: 256,
-        height: 400, // Altura adicionada
         left: 4,
         boxSizing: 'border-box',
         border: `1px solid ${Colors.white}`,
@@ -283,7 +274,7 @@ const styles: StyleSheetCSS = {
         borderBottomColor: Colors.darkGray,
         borderRightColor: Colors.darkGray,
         flex: 1,
-        display: 'flex' // Adicionado
+        display: 'flex'
     },
     startMenuIcon: {
         width: 32,
@@ -295,11 +286,10 @@ const styles: StyleSheetCSS = {
         marginLeft: 8,
     },
     startMenuOption: {
-        display: 'flex', // Adicionado
         alignItems: 'center',
-        height: 48, // Altura ajustada
+        height: 24,
         padding: 12,
-        cursor: 'pointer' // Adicionado
+        display: 'flex'
     },
     startMenuSpace: {
         flex: 1,
@@ -323,8 +313,8 @@ const styles: StyleSheetCSS = {
     },
     tabContainerOuter: {
         display: 'flex',
-        flex: '1 1 auto', // Ajustado
-        maxWidth: 150, // Ajustado
+        flex: 1,
+        maxWidth: 300,
         marginRight: 4,
         boxSizing: 'border-box',
         cursor: 'pointer',
@@ -340,14 +330,11 @@ const styles: StyleSheetCSS = {
         alignItems: 'center',
         paddingLeft: 4,
         flex: 1,
-        overflow: 'hidden' // Adicionado
     },
     tabIcon: {
         marginRight: 6,
-        flexShrink: 0 // Adicionado
     },
     startContainer: {
-        display: 'flex', // Adicionado
         alignItems: 'center',
         flexShrink: 1,
         border: `1px solid ${Colors.lightGray}`,
@@ -356,6 +343,7 @@ const styles: StyleSheetCSS = {
         padding: 1,
         paddingLeft: 5,
         paddingRight: 5,
+        display: 'flex'
     },
     startContainerOuter: {
         marginLeft: 3,
@@ -367,10 +355,9 @@ const styles: StyleSheetCSS = {
     },
     toolbarTabsContainer: {
         flex: 1,
-        display: 'flex', // Adicionado
         marginLeft: 4,
         marginRight: 4,
-        overflow: 'hidden' // Adicionado
+        display: 'flex'
     },
     startIcon: {
         marginRight: 4,
@@ -379,17 +366,16 @@ const styles: StyleSheetCSS = {
         borderTop: `1px solid ${Colors.white}`,
         alignItems: 'center',
         flex: 1,
-        display: 'flex', // Adicionado
-        width: '100%' // Adicionado
+        display: 'flex'
     },
     toolbar: {
         flexGrow: 1,
         width: '100%',
-        display: 'flex', // Adicionado
-        alignItems: 'center' // Adicionado
+        display: 'flex',
+        alignItems: 'center'
     },
     time: {
-        flexShrink: 0, // Ajustado
+        flexShrink: 0,
         width: 86,
         height: 24,
         boxSizing: 'border-box',
@@ -401,7 +387,7 @@ const styles: StyleSheetCSS = {
         justifyContent: 'space-between',
         alignItems: 'center',
         borderLeftColor: Colors.darkGray,
-        display: 'flex' // Adicionado
+        display: 'flex'
     },
     volumeIcon: {
         cursor: 'pointer',
@@ -410,9 +396,9 @@ const styles: StyleSheetCSS = {
     tabText: {
         fontSize: 14,
         fontFamily: 'MSSerif',
-        whiteSpace: 'nowrap', // Adicionado
-        overflow: 'hidden', // Adicionado
-        textOverflow: 'ellipsis' // Adicionado
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
     },
     timeText: {
         fontSize: 12,
