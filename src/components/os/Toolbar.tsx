@@ -1,29 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Colors from '../../constants/colors';
 import { Icon } from '../general';
-// Se tiver um ficheiro de som global, pode importá-lo aqui.
-// import clickSoundFile from '../../assets/sounds/click.mp3';
-
-// --- INÍCIO DA ALTERAÇÃO 1: Definição de Tipos ---
-// Para resolver os erros do Vercel, definimos os tipos exatos que o seu projeto espera.
-// A lista de IconName foi retirada da mensagem de erro anterior.
-export type IconName =
-    | 'close' | 'volumeOn' | 'windowResize' | 'maximize' | 'minimize' | 'computerBig'
-    | 'computerSmall' | 'myComputer' | 'showcaseIcon' | 'trailIcon' | 'doomIcon'
-    | 'scrabbleIcon' | 'wordleIcon' | 'credits' | 'cdIcon' | 'minecraftIcon'
-    | 'calculatorIcon' | 'volumeOff' | 'windowsStartIcon';
-
-export interface DesktopWindows {
-    [key: string]: {
-        zIndex: number;
-        minimized: boolean;
-        component: JSX.Element;
-        name: string;
-        icon: IconName;
-    };
-}
-// --- FIM DA ALTERAÇÃO 1 ---
-
+// import { } from '../general';
+// import Home from '../site/Home';
+// import Window from './Window';
 
 export interface ToolbarProps {
     windows: DesktopWindows;
@@ -67,14 +47,16 @@ const Toolbar: React.FC<ToolbarProps> = ({
 
     const [time, setTime] = useState(getTime());
 
-    // Corrigido para não criar um loop de timeouts
-    useEffect(() => {
-        const timerId = setInterval(() => {
-            setTime(getTime());
+    const updateTime = () => {
+        setTime(getTime());
+        setTimeout(() => {
+            updateTime();
         }, 5000);
-        return () => clearInterval(timerId);
-    }, []);
+    };
 
+    useEffect(() => {
+        updateTime();
+    });
 
     const onCheckClick = () => {
         if (lastClickInside.current) {
@@ -85,26 +67,12 @@ const Toolbar: React.FC<ToolbarProps> = ({
         lastClickInside.current = false;
     };
 
-    // --- INÍCIO DA ALTERAÇÃO 2: Lógica de Som e Clique Corrigida ---
     useEffect(() => {
-        // Função para detetar se é um dispositivo de toque
-        const isTouchDevice = () => 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-        
-        // Escolhe o evento correto para evitar sons duplicados no mobile
-        const eventType = isTouchDevice() ? 'touchstart' : 'mousedown';
-
-        const handleGlobalClick = () => {
-            // Se tiver um som de clique global, ele deve ser tocado aqui
-            // new Audio(clickSoundFile).play();
-            onCheckClick();
-        };
-
-        window.addEventListener(eventType, handleGlobalClick, false);
+        window.addEventListener('mousedown', onCheckClick, false);
         return () => {
-            window.removeEventListener(eventType, handleGlobalClick, false);
+            window.removeEventListener('mousedown', onCheckClick, false);
         };
-    }, []); // Mantido como no seu original, para executar uma vez.
-    // --- FIM DA ALTERAÇÃO 2 ---
+    }, []);
 
     const onStartWindowClicked = () => {
         setStartWindowOpen(true);
@@ -153,12 +121,19 @@ const Toolbar: React.FC<ToolbarProps> = ({
             <div style={styles.toolbarInner}>
                 <div style={styles.toolbar}>
                     <div
-                        // A sintaxe aqui foi corrigida para ser segura para o TypeScript
-                        style={{ ...styles.startContainerOuter, ...(startWindowOpen && styles.activeTabOuter) }}
+                        style={Object.assign(
+                            {},
+                            styles.startContainerOuter,
+                            startWindowOpen && styles.activeTabOuter
+                        )}
                         onMouseDown={toggleStartWindow}
                     >
                         <div
-                            style={{ ...styles.startContainer, ...(startWindowOpen && styles.activeTabInner) }}
+                            style={Object.assign(
+                                {},
+                                styles.startContainer,
+                                startWindowOpen && styles.activeTabInner
+                            )}
                         >
                             <Icon
                                 size={18}
@@ -173,15 +148,27 @@ const Toolbar: React.FC<ToolbarProps> = ({
                             return (
                                 <div
                                     key={key}
-                                    style={{ ...styles.tabContainerOuter, ...((lastActive === key && !windows[key].minimized) && styles.activeTabOuter) }}
+                                    style={Object.assign(
+                                        {},
+                                        styles.tabContainerOuter,
+                                        lastActive === key &&
+                                            !windows[key].minimized &&
+                                            styles.activeTabOuter
+                                    )}
                                     onMouseDown={() => toggleMinimize(key)}
                                 >
                                     <div
-                                        style={{ ...styles.tabContainer, ...((lastActive === key && !windows[key].minimized) && styles.activeTabInner) }}
+                                        style={Object.assign(
+                                            {},
+                                            styles.tabContainer,
+                                            lastActive === key &&
+                                                !windows[key].minimized &&
+                                                styles.activeTabInner
+                                        )}
                                     >
                                         <Icon
                                             size={18}
-                                            icon={windows[key].icon} // Agora o tipo é compatível
+                                            icon={windows[key].icon}
                                             style={styles.tabIcon}
                                         />
                                         <p style={styles.tabText}>
@@ -202,7 +189,6 @@ const Toolbar: React.FC<ToolbarProps> = ({
     );
 };
 
-// O seu objeto de estilos original, completo e intacto.
 const styles: StyleSheetCSS = {
     toolbarOuter: {
         boxSizing: 'border-box',
@@ -355,6 +341,7 @@ const styles: StyleSheetCSS = {
     },
     toolbarInner: {
         borderTop: `1px solid ${Colors.white}`,
+
         alignItems: 'center',
         flex: 1,
     },
@@ -372,6 +359,7 @@ const styles: StyleSheetCSS = {
         paddingRight: 4,
         border: `1px solid ${Colors.white}`,
         borderTopColor: Colors.darkGray,
+
         justifyContent: 'space-between',
         alignItems: 'center',
         borderLeftColor: Colors.darkGray,
@@ -389,7 +377,5 @@ const styles: StyleSheetCSS = {
         fontFamily: 'MSSerif',
     },
 };
-
-type StyleSheetCSS = { [key: string]: React.CSSProperties };
 
 export default Toolbar;
