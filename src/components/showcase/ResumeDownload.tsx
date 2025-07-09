@@ -10,8 +10,8 @@ const ResumeDownload: React.FC<ResumeDownloadProps> = ({ altText }) => {
 
   const getCurrentResume = () => {
     return selectedLanguage === 'PT'
-      ? '/assets/resume/CV - PT.pdf'
-      : '/assets/resume/CV - EN.pdf';
+      ? 'https://raw.githubusercontent.com/PeteerPT/portfolioweb/main/public/assets/resume/CV%20-%20PT.pdf'
+      : 'https://raw.githubusercontent.com/PeteerPT/portfolioweb/main/public/assets/resume/CV%20-%20EN.pdf';
   };
 
   return (
@@ -57,7 +57,7 @@ const ResumeDownload: React.FC<ResumeDownloadProps> = ({ altText }) => {
           <a
             rel="noreferrer"
             target="_blank"
-            href="/assets/resume/CV - EN.pdf"
+            href="https://raw.githubusercontent.com/PeteerPT/portfolioweb/main/public/assets/resume/CV%20-%20EN.pdf"
             style={styles.quickLink}
           >
             English
@@ -66,7 +66,7 @@ const ResumeDownload: React.FC<ResumeDownloadProps> = ({ altText }) => {
           <a
             rel="noreferrer"
             target="_blank"
-            href="/assets/resume/CV - PT.pdf"
+            href="https://raw.githubusercontent.com/PeteerPT/portfolioweb/main/public/assets/resume/CV%20-%20PT.pdf"
             style={styles.quickLink}
           >
             Português
