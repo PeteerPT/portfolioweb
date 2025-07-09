@@ -215,7 +215,7 @@ const Contact: React.FC<ContactProps> = () => {
       </div>
     </>
   );
-};
+}
 
 const styles: StyleSheetCSS = {
   sitePageContent: {
